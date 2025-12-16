@@ -3,7 +3,7 @@ from typing import Collection
 
 import cfgcaddy.utils as utils
 from cfgcaddy.link import create_links, find_absences
-from cfgcaddy.link_spec import LinkSpec, LinkingResult
+from cfgcaddy.link_spec import LinkingResult, LinkSpec
 from cfgcaddy.utils import create_dirs
 
 logger = logging.getLogger()
@@ -15,7 +15,6 @@ class Linker:
     custom_links: Collection[LinkSpec]
 
     def __init__(self, linker_config, interactive=True) -> None:
-
         if not linker_config:
             raise Exception("Linker requires Config!")
 
@@ -33,7 +32,10 @@ class Linker:
 
         # TODO: Rewrite find_absences
         absent_files, absent_dirs = find_absences(
-            self.config.linker_src, self.config.linker_dest, self.ignored_patterns
+            self.config.linker_src,
+            self.config.linker_dest,
+            self.ignored_patterns,
+            use_copy=self.config.use_copy_mode,
         )
 
         if not absent_files and not absent_dirs:

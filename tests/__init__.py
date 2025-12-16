@@ -1,11 +1,11 @@
 import logging
-import sys
-from functools import reduce
 import operator
 import os
 import shutil
+import sys
 import tempfile
 import unittest
+from functools import reduce
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -21,16 +21,16 @@ def set_in_dict(data_dict, map_list, value):
 
 
 def list_files(start_path):
-    for root, dirs, files in os.walk(start_path, followlinks=True):
+    for root, _dirs, files in os.walk(start_path, followlinks=True):
         level = root.replace(start_path, "").count(os.sep)
         indent = " " * 4 * level
-        print("{}{}/".format(indent, os.path.basename(root)))
+        print(f"{indent}{os.path.basename(root)}/")
         sub_indent = " " * 4 * (level + 1)
         for f in files:
             file_name = f
             if os.path.islink(os.path.join(root, f)):
                 f += "*"
-            print("{}{}".format(sub_indent, file_name))
+            print(f"{sub_indent}{file_name}")
 
 
 def dir_dict(start_path):
@@ -86,7 +86,7 @@ class FileLinkTestCase(unittest.TestCase):
     def recursive_dircmp(self, dircmp_obj):
         self.assertListEqual(dircmp_obj.left_only, [])
         self.assertListEqual(dircmp_obj.right_only, [])
-        for directory, sub_directory in dircmp_obj.subdirs.items():
+        for _directory, sub_directory in dircmp_obj.subdirs.items():
             self.recursive_dircmp(sub_directory)
 
     def assertDestMatchesExpected(self):

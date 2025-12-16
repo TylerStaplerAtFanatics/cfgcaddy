@@ -37,7 +37,6 @@ class TestCustomLinker(FileLinkTestCase):
         return Linker(cfg, interactive=False)
 
     def check_custom_linker(self, lines, config=None):
-
         if config is None:
             config = {
                 "preferences": {
@@ -342,9 +341,9 @@ class TestCustomLinker(FileLinkTestCase):
             src_var = "%FILE_SRC%"
 
         logger.debug("{}:{}".format(os.environ["FILE_SRC"], os.environ["FILE_DEST"]))
-        logger.debug("{}:{}".format(src_var, dest_var))
+        logger.debug(f"{src_var}:{dest_var}")
 
-        self.check_custom_linker(["{}:{}".format(src_var, dest_var)])
+        self.check_custom_linker([f"{src_var}:{dest_var}"])
 
     def test_hidden_file(self):
         self.source_tree = {
@@ -358,7 +357,6 @@ class TestCustomLinker(FileLinkTestCase):
         self.check_basic_linker()
 
     def test_hidden_folder(self):
-
         self.source_tree = {".vim": {"stuff": ""}}
 
         self.expected_tree = {".vim": {"stuff": ""}}

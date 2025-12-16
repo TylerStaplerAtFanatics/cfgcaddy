@@ -16,7 +16,7 @@ class LinkSpec(Protocol):
     dest: Path
 
     def __repr__(self) -> str:
-        return "{} => {}".format(self.src, self.dest)
+        return f"{self.src} => {self.dest}"
 
     def create(self, interactive: bool = False) -> LinkingResult:
         pass

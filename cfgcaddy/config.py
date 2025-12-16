@@ -5,7 +5,7 @@ import platform
 import sys
 from os import path
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
 
 from ruamel.yaml import YAML
 
@@ -17,7 +17,7 @@ yaml = YAML(typ="safe")  # default, if not specified, is 'rt' (round-trip)
 
 
 MISSING_FILE_MESSAGE = (
-    "Please create a {} file in the same" " directory as the linker python file."
+    "Please create a {} file in the same directory as the linker python file."
 )
 
 
@@ -65,12 +65,33 @@ class LinkerConfig:
             raise ValueError("linker_dest is not set in the config")
         return utils.expand_path(dest)
 
+    @property
+    def use_copy_mode(self) -> bool:
+        """Check if copy mode should be used instead of symlinks
+
+        Returns:
+            bool: True if copy mode is enabled or auto-detected for Termux
+        """
+        # Check explicit preference
+        link_mode = self.preferences.get("link_mode", "auto")
+
+        if link_mode == "copy":
+            return True
+        elif link_mode == "symlink":
+            return False
+        else:  # auto mode
+            # Auto-detect based on platform and destination
+            if utils.is_termux():
+                # Check if destination supports symlinks
+                return not utils.can_symlink(self.linker_dest)
+            return False
+
     def write_config(self, prompt=True) -> None:
         if not os.path.exists(self.config_file_path) or (
             not prompt
             or utils.user_confirm(
-                "The file {} exists.\n"
-                "Would you like to overwrite this file?".format(self.config_file_path)
+                f"The file {self.config_file_path} exists.\n"
+                "Would you like to overwrite this file?"
             )
         ):
             try:
@@ -79,11 +100,11 @@ class LinkerConfig:
                     logger.debug(self.config_file_path)
                     yaml.dump(self.config, file)
             except Exception as e:
-                logger.error("Error writing config: {}".format(e))
+                logger.error(f"Error writing config: {e}")
 
     def read_config(self) -> None:
         if os.path.isfile(self.config_file_path):
-            with open(self.config_file_path, "r") as file:
+            with open(self.config_file_path) as file:
                 self.config = yaml.load(file)
 
     def generate_links(self, links):
@@ -118,12 +139,13 @@ class LinkerConfig:
                             Link(
                                 utils.expand_path(src_path),
                                 utils.expand_path(dest_path),
+                                use_copy=self.use_copy_mode,
                             )
                         )
             except KeyError:
                 logger.exception("Bad custom link")
 
-        logger.debug("Custom Links => {}".format(custom_links))
+        logger.debug(f"Custom Links => {custom_links}")
         self.links = custom_links
 
     @property
@@ -137,7 +159,7 @@ class LinkerConfig:
                 link["dest"] = [link["dest"]]
             links.append(link)
         logger.debug("Links before formatting: {}".format(self.config.get("links")))
-        logger.debug("Links after formatting: {}".format(links))
+        logger.debug(f"Links after formatting: {links}")
         return links
 
     @property
@@ -145,5 +167,5 @@ class LinkerConfig:
         lines = self.config.get("ignore", [])
         """Parse the gitignore style file
         """
-        logger.debug("Ignore Patterns: {}".format(lines))
+        logger.debug(f"Ignore Patterns: {lines}")
         return lines

@@ -10,15 +10,17 @@ from questionary import prompt
 
 import cfgcaddy
 import cfgcaddy.config
-import cfgcaddy.utils
 import cfgcaddy.linker
+import cfgcaddy.utils
 
 logger = logging.getLogger()
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 
-config_questions = {
-    "preferences": [
+
+def get_default_questions():
+    """Generate configuration questions based on platform"""
+    questions = [
         {
             "type": "input",
             "name": "linker_src",
@@ -31,26 +33,76 @@ config_questions = {
             "message": "Where should your configs be linked to?",
             "default": cfgcaddy.HOME_DIR,
             "validate": lambda p: p and os.path.isdir(cfgcaddy.utils.expand_path(p)),
-        }
-        # TODO: Add additional preferences like what to do on a conflict
-        # or the ability to use a basic ignore (.git, only .*, etc)
-    ],
-}
+        },
+    ]
 
-default_config = {"links": [], "ignore": []}
+    # Add link mode question for Termux
+    if cfgcaddy.utils.is_termux():
+        shared_storage = cfgcaddy.utils.get_termux_shared_storage()
+        note = ""
+        if shared_storage:
+            note = f"\nNote: Termux shared storage detected at {shared_storage}"
+
+        questions.append(
+            {
+                "type": "select",
+                "name": "link_mode",
+                "message": f"Link mode (symlink or copy)?{note}",
+                "choices": [
+                    {
+                        "name": "auto",
+                        "value": "auto",
+                        "title": "Auto (detect based on destination)",
+                    },
+                    {
+                        "name": "symlink",
+                        "value": "symlink",
+                        "title": "Symlink (faster)",
+                    },
+                    {
+                        "name": "copy",
+                        "value": "copy",
+                        "title": "Copy (works on shared storage)",
+                    },
+                ],
+                "default": "auto",
+            }
+        )
+
+    return {"preferences": questions}
+
+
+config_questions = get_default_questions()
+
+default_config: dict = {"links": [], "ignore": []}
 
 
 def create_config(config_path, new_config=None):
-    logger.debug("default_config: {}".format(new_config))
+    logger.debug(f"default_config: {new_config}")
 
     if not new_config:
         new_config = default_config
 
-    for section, questions in config_questions.items():
+    # Show Termux-specific information
+    if cfgcaddy.utils.is_termux():
+        logger.info("Running on Termux detected")
+        shared_storage = cfgcaddy.utils.get_termux_shared_storage()
+        if shared_storage:
+            logger.info(f"Termux shared storage available at: {shared_storage}")
+            logger.info("Note: Symlinks may not work on shared storage (FAT/exFAT)")
+        else:
+            logger.info(
+                "Termux shared storage not found. Run 'termux-setup-storage' to access shared storage."
+            )
+
+    # Get fresh questions in case platform detection changed
+    questions_dict = get_default_questions()
+
+    for section, questions in questions_dict.items():
         if not new_config.get(section):
             new_config[section] = prompt(questions)
 
-    logger.debug("Creating Config => {}".format(new_config))
+    logger.debug(f"Creating Config => {new_config}")
 
     config = cfgcaddy.config.LinkerConfig(
         config_file_path=config_path, default_config=new_config
@@ -87,6 +139,11 @@ def link(config, no_interactive):
         return
     else:
         linker_config = cfgcaddy.config.LinkerConfig(config_file_path=config)
+
+    # Show information about the linking mode
+    if cfgcaddy.utils.is_termux():
+        mode = "copy" if linker_config.use_copy_mode else "symlink"
+        logger.info(f"Running on Termux using {mode} mode")
 
     caddy = cfgcaddy.linker.Linker(linker_config, interactive=no_interactive)
     caddy.create_links()
@@ -127,9 +184,9 @@ def init(src_directory, dest_directory, config):
 def symlink_config(kind, src, dest):
     try:
         os.symlink(src, dest)
-        logger.info("Symlinking {} cfgcaddy config".format(kind))
+        logger.info(f"Symlinking {kind} cfgcaddy config")
     except OSError:
-        logger.error("Symlinking {} cfgcaddy config failed".format(kind))
+        logger.error(f"Symlinking {kind} cfgcaddy config failed")
         if platform.system() == "Windows":
             logger.error(
                 "Ensure that cfgcaddy is being run as an Administrator.\n"
@@ -140,7 +197,8 @@ def symlink_config(kind, src, dest):
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
+    except AttributeError:
+        # Not on Windows or ctypes not available
         return False
 
 

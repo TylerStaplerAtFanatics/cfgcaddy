@@ -9,7 +9,7 @@ class TestLinkFolder(FileLinkTestCase):
     def recursive_dircmp(self, dircmp_obj):
         self.assertListEqual(dircmp_obj.left_only, [])
         self.assertListEqual(dircmp_obj.right_only, [])
-        for dir_name, sub_dir in dircmp_obj.subdirs.items():
+        for _dir_name, sub_dir in dircmp_obj.subdirs.items():
             self.recursive_dircmp(sub_dir)
 
     def link_and_print(self, src: str, dest: str):
