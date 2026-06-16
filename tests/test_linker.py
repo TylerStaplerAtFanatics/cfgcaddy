@@ -1,10 +1,14 @@
 import logging
 import os
 import platform
+import socket
 
+import pytest
 from ruamel.yaml import YAML
 
+from cfgcaddy.alternate import AlternateContext
 from cfgcaddy.config import LinkerConfig
+from cfgcaddy.link import find_absences
 from cfgcaddy.linker import Linker
 from tests import FileLinkTestCase, create_files_from_tree
 
@@ -362,3 +366,129 @@ class TestCustomLinker(FileLinkTestCase):
         self.expected_tree = {".vim": {"stuff": ""}}
 
         self.check_basic_linker()
+
+
+# ---------------------------------------------------------------------------
+# Alternate-file tests (pytest-style, use tmp_path)
+# ---------------------------------------------------------------------------
+
+
+def _make_linker_config(src_dir, dest_dir, config_path, links, ignore=None):
+    """Helper that writes a YAML config and returns a LinkerConfig."""
+    if ignore is None:
+        ignore = []
+    config = {
+        "preferences": {
+            "linker_src": str(src_dir),
+            "linker_dest": str(dest_dir),
+        },
+        "links": links,
+        "ignore": ignore,
+    }
+    yaml_inst = YAML(typ="safe")
+    with open(config_path, "w") as f:
+        yaml_inst.dump(config, f)
+    return LinkerConfig(config_file_path=str(config_path))
+
+
+class TestAlternateIgnorePatterns:
+    """Ignore patterns must match against the base name (before ##)."""
+
+    def test_ignore_pattern_matches_hashed_variant(self, tmp_path):
+        src_dir = tmp_path / "src"
+        dest_dir = tmp_path / "dest"
+        src_dir.mkdir()
+        dest_dir.mkdir()
+
+        # Create secrets.sh##os.darwin in the source dir
+        (src_dir / "secrets.sh##os.darwin").touch()
+        (src_dir / "safe.sh").touch()
+
+        absent_files, _ = find_absences(
+            src_dir,
+            dest_dir,
+            ignored_patterns=["secrets.sh"],
+        )
+
+        dest_names = [os.path.basename(str(lnk.dest)) for lnk in absent_files]
+        assert "secrets.sh" not in dest_names
+        assert "safe.sh" in dest_names
+
+
+class TestAlternateSymlinkDest:
+    """A ##-suffixed source file must produce a clean dest symlink name."""
+
+    def test_hashed_source_links_to_base_name_dest(self, tmp_path):
+        src_dir = tmp_path / "src"
+        dest_dir = tmp_path / "dest"
+        src_dir.mkdir()
+        dest_dir.mkdir()
+
+        current_os = platform.system().lower()
+        src_file = src_dir / f"gitconfig##os.{current_os}"
+        src_file.touch()
+
+        absent_files, _ = find_absences(src_dir, dest_dir)
+
+        assert len(absent_files) == 1
+        lnk = absent_files[0]
+        # src must point to the ##-suffixed file on disk
+        assert lnk.src.name == f"gitconfig##os.{current_os}"
+        # dest must NOT include ##
+        assert "##" not in lnk.dest.name
+        assert lnk.dest.name == "gitconfig"
+
+
+class TestAlternateNoMatchWarning:
+    """When no candidate matches, a stderr warning is emitted and no link created."""
+
+    def test_no_matching_candidate_warns_and_skips(self, tmp_path, capsys):
+        src_dir = tmp_path / "src"
+        dest_dir = tmp_path / "dest"
+        src_dir.mkdir()
+        dest_dir.mkdir()
+        config_path = tmp_path / ".cfgcaddy.yml"
+
+        # Create a candidate that won't match the real current OS
+        wrong_os = "fakeos_xyz"
+        (src_dir / f"gitconfig##os.{wrong_os}").touch()
+
+        cfg = _make_linker_config(
+            src_dir,
+            dest_dir,
+            config_path,
+            links=[{"src": f"gitconfig##os.{wrong_os}"}],
+        )
+
+        captured = capsys.readouterr()
+        assert "Warning" in captured.err or "no candidate" in captured.err.lower()
+        assert cfg.links == []
+
+
+class TestAlternateHighestScoreWins:
+    """The highest-scoring candidate wins when multiple candidates match."""
+
+    def test_more_specific_candidate_wins(self, tmp_path, capsys):
+        src_dir = tmp_path / "src"
+        dest_dir = tmp_path / "dest"
+        src_dir.mkdir()
+        dest_dir.mkdir()
+        config_path = tmp_path / ".cfgcaddy.yml"
+
+        current_os = platform.system().lower()
+        current_hostname = socket.gethostname()
+
+        specific = src_dir / f"gitconfig##os.{current_os}##hostname.{current_hostname}"
+        generic = src_dir / f"gitconfig##os.{current_os}"
+        specific.touch()
+        generic.touch()
+
+        cfg = _make_linker_config(
+            src_dir,
+            dest_dir,
+            config_path,
+            links=[{"src": "gitconfig##*"}],
+        )
+
+        assert len(cfg.links) == 1
+        assert cfg.links[0].src.name == specific.name

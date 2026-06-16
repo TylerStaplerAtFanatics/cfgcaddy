@@ -7,7 +7,7 @@ authors = [
     { name = "Tyler Stapler", email = "tystapler@gmail.com" }
 ]
 license = { text = "MIT" }
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -25,6 +25,10 @@ dependencies = [
     "pathspec>=0.8.1",
     "ruamel.yaml>=0.16.12",
     "questionary>=1.9.0",
+    "jinja2>=3.1.0",
+    "rich>=10.0.0",
+    "tomli>=1.1.0; python_version < '3.11'",
+    "tomli-w>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -49,7 +53,7 @@ packages = ["cfgcaddy"]
 [tool.ruff]
 # Set the line length to match Black's default
 line-length = 88
-target-version = "py37"
+target-version = "py310"
 
 # Exclude directories
 exclude = [
@@ -80,9 +84,6 @@ ignore = [
     "B008",  # do not perform function calls in argument defaults
     "B011",  # assert False is intentional for exhaustiveness checking
     "C901",  # too complex (can be addressed incrementally)
-    "UP006", # Use list/dict instead of List/Dict - keeping compatible with Python 3.7-3.9
-    "UP007", # Union syntax - keeping compatible with Python 3.7-3.9
-    "UP045", # Optional syntax - keeping compatible with Python 3.7-3.9
 ]
 
 [tool.ruff.format]
@@ -99,7 +100,7 @@ line-ending = "auto"
 known-first-party = ["cfgcaddy"]
 
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true

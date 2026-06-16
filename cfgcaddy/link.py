@@ -310,7 +310,13 @@ def find_absences(
             for dir_name in dirs
             if not ignored.match_file(path.join(rel_path, dir_name))
         ]
-        files[:] = [f for f in files if not ignored.match_file(path.join(rel_path, f))]
+        # For files: ignore check uses the base name (before ##) so patterns
+        # like "secrets.sh" also match "secrets.sh##os.darwin".
+        files[:] = [
+            f
+            for f in files
+            if not ignored.match_file(path.join(rel_path, f.split("##")[0]))
+        ]
 
         # Create list of dirs that don't exist
         for dir_name in dirs:
@@ -322,11 +328,14 @@ def find_absences(
 
         # Create a list of files to be symlinked
         for f in files:
-            pathname = path.join(dest, rel_path, f)
+            # f       = full ##-suffixed filename on disk (used for src path)
+            # base_f  = base name before ## (used for dest symlink path)
+            base_f = f.split("##")[0]
+            pathname = path.join(dest, rel_path, base_f)
             if not path.exists(pathname):
                 if path.islink(pathname) and not path.exists(pathname):
                     os.unlink(pathname)  # Fix Broken Links
-                # Add the source and destination for the symlink
+                # src uses f (the actual file on disk); dest uses base_f
                 absent_files.append(
                     Link(path.join(root, f), pathname, use_copy=use_copy)
                 )

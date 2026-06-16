@@ -2,15 +2,20 @@ import glob
 import logging
 import os
 import platform
+import socket
 import sys
 from os import path
 from pathlib import Path
 from typing import Dict, List
 
+import click
 from ruamel.yaml import YAML
 
 from cfgcaddy import utils
+from cfgcaddy.alternate import AlternateContext, parse_alternate_name, select_candidate
+from cfgcaddy.data import LocalDataLoader
 from cfgcaddy.link import Link
+from cfgcaddy.template import TemplateRenderer
 
 logger = logging.getLogger()
 yaml = YAML(typ="safe")  # default, if not specified, is 'rt' (round-trip)
@@ -25,7 +30,7 @@ class LinkerConfig:
     config: Dict = {}
     links: List[Link] = []
 
-    def __init__(self, config_file_path=None, default_config=None) -> None:
+    def __init__(self, config_file_path=None, default_config=None, profile: str | None = None) -> None:
         self.config_file_path = config_file_path
 
         if default_config:
@@ -41,6 +46,20 @@ class LinkerConfig:
         if not self.linker_src or not self.linker_dest:
             logger.error("You need to specify a src and destination")
             sys.exit(1)
+
+        loader = LocalDataLoader(profile=profile)
+        self.local_data = loader.load()
+        self.profile = profile
+        self.renderer = TemplateRenderer(
+            variables=self.local_data,
+            linker_src=Path(self.linker_src),
+        )
+
+        self.alternate_context = AlternateContext(
+            os=platform.system().lower(),
+            hostname=socket.gethostname(),
+            profile=self.profile,
+        )
 
         self.generate_links(self.links_yaml)
 
@@ -119,25 +138,52 @@ class LinkerConfig:
                 link_destinations = link.get("dest")
                 src_files = glob.glob(path.join(self.linker_src, link_src))
 
+                # Group src_files by base name (before ##) to resolve alternates
+                groups: dict[str, list[Path]] = {}
+                for src_path in src_files:
+                    base_name, _ = parse_alternate_name(path.basename(src_path))
+                    groups.setdefault(base_name, []).append(Path(src_path))
+
+                # Select one winner per base name
+                resolved_src_files: list[str] = []
+                for base_name, candidates in groups.items():
+                    winner = select_candidate(candidates, self.alternate_context)
+                    if winner is None:
+                        click.echo(
+                            f"Warning: no candidate matches for '{base_name}' on this machine - skipping",
+                            err=True,
+                        )
+                        continue
+                    resolved_src_files.append(str(winner))
+
                 # To account for no destination
                 if not link_destinations:
-                    if len(src_files) > 1:
+                    if len(resolved_src_files) > 1:
                         link_destinations = [path.dirname(link_src)]
                     else:
                         link_destinations = [link_src]
-                for src_path in src_files:
+                for src_path in resolved_src_files:
+                    # Render .tmpl files; non-.tmpl files are returned unchanged.
+                    effective_src = str(self.renderer.render_if_template(Path(src_path)))
+                    # Destination uses the base name (strip ## suffix) so the
+                    # symlink in $HOME doesn't have ## in its name.
+                    src_basename = path.basename(src_path)
+                    base_basename = src_basename.split("##")[0]
                     for dest in map(utils.expand_path, link_destinations):
-                        if len(src_files) > 1:
-                            src_name = path.join(dest, path.basename(src_path))
+                        if len(resolved_src_files) > 1:
+                            src_name = path.join(dest, base_basename)
                         else:
-                            src_name = dest
+                            # Single file: dest was derived from link_src (which
+                            # may include ##).  Rebuild using base name.
+                            dest_base, _ = parse_alternate_name(str(dest))
+                            src_name = dest_base
                         if path.isabs(dest):
-                            dest_path = src_name
+                            dest_path = path.join(path.dirname(dest), base_basename)
                         else:
                             dest_path = path.join(self.linker_dest, src_name)
                         custom_links.append(
                             Link(
-                                utils.expand_path(src_path),
+                                utils.expand_path(effective_src),
                                 utils.expand_path(dest_path),
                                 use_copy=self.use_copy_mode,
                             )

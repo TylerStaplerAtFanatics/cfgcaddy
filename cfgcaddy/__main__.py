@@ -4,6 +4,7 @@ import logging
 import os
 import platform
 import sys
+from dataclasses import dataclass, field
 
 import click
 from questionary import prompt
@@ -12,10 +13,21 @@ import cfgcaddy
 import cfgcaddy.config
 import cfgcaddy.linker
 import cfgcaddy.utils
+from cfgcaddy.commands.secrets import secrets
 
 logger = logging.getLogger()
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+
+
+@dataclass
+class CfgcaddyContext:
+    config_path: str
+    profile: str | None
+    variables: dict = field(default_factory=dict)
+
+
+pass_cfg = click.make_pass_decorator(CfgcaddyContext, ensure=True)
 
 
 def get_default_questions():
@@ -114,12 +126,23 @@ def create_config(config_path, new_config=None):
 @click.group()
 @click.option("-d", "--debug", is_flag=True, help="Enable Debugging output")
 @click.option("-q", "--quiet", is_flag=True, help="Silence cfgcaddy")
-def main(debug, quiet):
+@click.option(
+    "--profile",
+    envvar="CFGCADDY_PROFILE",
+    default=None,
+    help="Active profile name",
+)
+@click.pass_context
+def main(ctx, debug, quiet, profile):
     """A tool for managing your configuration files"""
     if debug:
         logger.setLevel(logging.DEBUG)
     if quiet:
         logger.setLevel(logging.ERROR)
+    ctx.obj = CfgcaddyContext(
+        config_path=cfgcaddy.DEFAULT_CONFIG_PATH,
+        profile=profile,
+    )
 
 
 @main.command()
@@ -130,7 +153,8 @@ def main(debug, quiet):
     help="The path to your cfgcaddy.yml",
 )
 @click.option("-y", "--no-interactive", is_flag=True)
-def link(config, no_interactive):
+@click.pass_context
+def link(ctx, config, no_interactive):
     """Link your config files"""
     if not os.path.isfile(config):
         logger.error(
@@ -138,14 +162,15 @@ def link(config, no_interactive):
         )
         return
     else:
-        linker_config = cfgcaddy.config.LinkerConfig(config_file_path=config)
+        profile = ctx.obj.profile if ctx.obj else None
+        linker_config = cfgcaddy.config.LinkerConfig(config_file_path=config, profile=profile)
 
     # Show information about the linking mode
     if cfgcaddy.utils.is_termux():
         mode = "copy" if linker_config.use_copy_mode else "symlink"
         logger.info(f"Running on Termux using {mode} mode")
 
-    caddy = cfgcaddy.linker.Linker(linker_config, interactive=no_interactive)
+    caddy = cfgcaddy.linker.Linker(linker_config, interactive=not no_interactive)
     caddy.create_links()
     caddy.create_custom_links()
 
@@ -200,6 +225,9 @@ def is_admin():
     except AttributeError:
         # Not on Windows or ctypes not available
         return False
+
+
+main.add_command(secrets)
 
 
 if __name__ == "__main__":
