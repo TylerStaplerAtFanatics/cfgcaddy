@@ -1,7 +1,6 @@
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Union
 
 from cfgcaddy.utils import convert_to_path
 
@@ -19,7 +18,7 @@ class FileState(str, Enum):
     UNKNOWN = "UNKNOWN"
 
     @classmethod
-    def from_pathlike(cls, f: Union[str, Path]):
+    def from_pathlike(cls, f: str | Path):
         f = convert_to_path(f)
         if f.is_symlink():
             if f.is_file():

@@ -6,13 +6,11 @@ from pathlib import Path
 import pytest
 
 from cfgcaddy.alternate import (
-    CONDITION_WEIGHTS,
     AlternateContext,
     parse_alternate_name,
     score_candidate,
     select_candidate,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -110,6 +108,18 @@ class TestScoreCandidate:
     def test_profile_missing_in_context_returns_none(self, ctx_darwin):
         """If context has no profile, a ##profile condition must not match."""
         assert score_candidate("gitconfig##profile.work", ctx_darwin) is None
+
+    @pytest.mark.parametrize(
+        "profile,expected",
+        [
+            ("work", 1016),   # matching profile → score = 16 + 1000
+            (None, None),     # no profile in context → disqualified
+            ("home", None),   # wrong profile → disqualified
+        ],
+    )
+    def test_profile_scoring_parametrized(self, profile, expected):
+        ctx = AlternateContext(os="darwin", hostname="mac", profile=profile)
+        assert score_candidate("gitconfig##profile.work", ctx) == expected
 
     def test_unrecognized_key_returns_none_and_warns(self, ctx_darwin, caplog):
         with caplog.at_level(logging.WARNING, logger="cfgcaddy.alternate"):

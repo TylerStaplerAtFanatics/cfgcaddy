@@ -1,7 +1,6 @@
 import dataclasses
 import filecmp
 from pathlib import Path
-from typing import List
 
 import pytest
 from _pytest.mark.structures import ParameterSet
@@ -9,7 +8,7 @@ from _pytest.mark.structures import ParameterSet
 from cfgcaddy.link import Link, LinkingResult
 
 
-def create_directory_of_fixtures(prefix: Path, fixtures: List[str]):
+def create_directory_of_fixtures(prefix: Path, fixtures: list[str]):
     """Create a directory of test fixtures from a list of strings
 
     Slashes at the end of a string indicate a directory
@@ -27,12 +26,12 @@ def create_directory_of_fixtures(prefix: Path, fixtures: List[str]):
 @dataclasses.dataclass
 class LinkTestCase:
     description: str
-    src_tree: List[str]
-    dest_tree: List[str]
+    src_tree: list[str]
+    dest_tree: list[str]
     link_src: str
     link_dest: str
-    expected_src_tree: List[str]
-    expected_dest_tree: List[str]
+    expected_src_tree: list[str]
+    expected_dest_tree: list[str]
     link_result: LinkingResult
 
     def initialize_fixture_directories(

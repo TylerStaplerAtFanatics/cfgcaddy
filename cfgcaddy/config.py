@@ -6,7 +6,6 @@ import socket
 import sys
 from os import path
 from pathlib import Path
-from typing import Dict, List
 
 import click
 from ruamel.yaml import YAML
@@ -27,8 +26,8 @@ MISSING_FILE_MESSAGE = (
 
 
 class LinkerConfig:
-    config: Dict = {}
-    links: List[Link] = []
+    config: dict = {}
+    links: list[Link] = []
 
     def __init__(self, config_file_path=None, default_config=None, profile: str | None = None) -> None:
         self.config_file_path = config_file_path
@@ -47,9 +46,12 @@ class LinkerConfig:
             logger.error("You need to specify a src and destination")
             sys.exit(1)
 
+        if profile is None:
+            profile = self.config.get("preferences", {}).get("default_profile")
+        self.profile = profile
+
         loader = LocalDataLoader(profile=profile)
         self.local_data = loader.load()
-        self.profile = profile
         self.renderer = TemplateRenderer(
             variables=self.local_data,
             linker_src=Path(self.linker_src),
@@ -64,7 +66,7 @@ class LinkerConfig:
         self.generate_links(self.links_yaml)
 
     @property
-    def preferences(self) -> Dict[str, str]:
+    def preferences(self) -> dict[str, str]:
         if not self.config:
             raise
         return self.config.get("preferences", {})
@@ -156,6 +158,11 @@ class LinkerConfig:
                         continue
                     resolved_src_files.append(str(winner))
 
+                # Track whether destinations were user-specified or auto-derived.
+                # Only auto-derived dests may carry ## in their name (inherited
+                # from link_src) and need the base-name strip.
+                user_specified_dest = bool(link_destinations)
+
                 # To account for no destination
                 if not link_destinations:
                     if len(resolved_src_files) > 1:
@@ -165,20 +172,25 @@ class LinkerConfig:
                 for src_path in resolved_src_files:
                     # Render .tmpl files; non-.tmpl files are returned unchanged.
                     effective_src = str(self.renderer.render_if_template(Path(src_path)))
-                    # Destination uses the base name (strip ## suffix) so the
-                    # symlink in $HOME doesn't have ## in its name.
+                    # base_basename strips ## so dest symlinks use the clean name.
                     src_basename = path.basename(src_path)
                     base_basename = src_basename.split("##")[0]
                     for dest in map(utils.expand_path, link_destinations):
                         if len(resolved_src_files) > 1:
                             src_name = path.join(dest, base_basename)
                         else:
-                            # Single file: dest was derived from link_src (which
-                            # may include ##).  Rebuild using base name.
-                            dest_base, _ = parse_alternate_name(str(dest))
-                            src_name = dest_base
+                            if user_specified_dest:
+                                # User gave an explicit dest — use it verbatim.
+                                src_name = str(dest)
+                            else:
+                                # Auto-derived from link_src; may carry ##.
+                                dest_base, _ = parse_alternate_name(str(dest))
+                                src_name = dest_base
                         if path.isabs(dest):
-                            dest_path = path.join(path.dirname(dest), base_basename)
+                            if user_specified_dest:
+                                dest_path = str(dest)
+                            else:
+                                dest_path = path.join(path.dirname(dest), base_basename)
                         else:
                             dest_path = path.join(self.linker_dest, src_name)
                         custom_links.append(

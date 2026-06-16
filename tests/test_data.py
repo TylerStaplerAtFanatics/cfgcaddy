@@ -4,7 +4,6 @@ import pytest
 
 from cfgcaddy.data import CfgcaddyError, LocalDataLoader, validate_profile_name
 
-
 # ---------------------------------------------------------------------------
 # LocalDataLoader.load()
 # ---------------------------------------------------------------------------

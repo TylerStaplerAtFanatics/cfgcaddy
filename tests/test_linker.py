@@ -3,10 +3,8 @@ import os
 import platform
 import socket
 
-import pytest
 from ruamel.yaml import YAML
 
-from cfgcaddy.alternate import AlternateContext
 from cfgcaddy.config import LinkerConfig
 from cfgcaddy.link import find_absences
 from cfgcaddy.linker import Linker

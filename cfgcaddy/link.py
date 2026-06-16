@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+from collections.abc import Sequence
 from os import path
 from pathlib import Path
-from typing import List, NoReturn, Optional, Sequence, Tuple, Union
+from typing import NoReturn
 
 import pathspec  # type: ignore
 
@@ -60,7 +61,7 @@ class Link(LinkSpec):
     use_copy: bool
 
     def __init__(
-        self, src: Union[str, Path], dest: Union[str, Path], use_copy: bool = False
+        self, src: str | Path, dest: str | Path, use_copy: bool = False
     ):
         self.src = convert_to_path(src)
         self.dest = convert_to_path(dest)
@@ -232,7 +233,7 @@ def link_folder(
         return LinkingResult.FAILED
 
 
-def create_links(links: Optional[Sequence[LinkSpec]] = None) -> None:
+def create_links(links: Sequence[LinkSpec] | None = None) -> None:
     """Create symlinks for each item in links
 
     Args:
@@ -273,9 +274,9 @@ def move_files(links: Sequence[LinkSpec]) -> None:
 def find_absences(
     src: Pathlike,
     dest: Pathlike,
-    ignored_patterns: Optional[List[str]] = None,
+    ignored_patterns: list[str] | None = None,
     use_copy: bool = False,
-) -> Tuple[List[Link], List[str]]:
+) -> tuple[list[Link], list[str]]:
     """Walk the source directory and return a lists of files and dirs absent
         from the destination directory
 

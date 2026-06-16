@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from click.testing import CliRunner
 from ruamel.yaml import YAML
 
@@ -144,7 +143,6 @@ def test_written_file_is_valid_toml(tmp_path):
 
 def test_init_idempotent(tmp_path):
     """Running secrets init twice with the same template produces the same result."""
-    import tomli_w
 
     linker_src = tmp_path / "src"
     linker_src.mkdir()

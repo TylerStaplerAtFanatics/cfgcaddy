@@ -9,7 +9,6 @@ import pytest
 from cfgcaddy.data import CfgcaddyError
 from cfgcaddy.template import TemplateRenderer
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

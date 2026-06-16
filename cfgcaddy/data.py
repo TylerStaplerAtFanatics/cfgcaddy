@@ -32,10 +32,10 @@ def validate_profile_name(name: str) -> None:
     candidate = (PROFILES_DIR / f"{name}.toml").resolve()
     try:
         candidate.relative_to(PROFILES_DIR.resolve())
-    except ValueError:
+    except ValueError as exc:
         raise CfgcaddyError(
             f"Profile name {name!r} resolves outside the profiles directory."
-        )
+        ) from exc
 
 
 class LocalDataLoader:
@@ -65,10 +65,10 @@ class LocalDataLoader:
             try:
                 with profile_path.open("rb") as fh:
                     profile_data: dict = tomllib.load(fh)
-            except FileNotFoundError:
+            except FileNotFoundError as exc:
                 raise CfgcaddyError(
                     f"Profile file not found: {profile_path}"
-                )
+                ) from exc
             # Shallow-merge: profile keys override base keys
             data = {**data, **profile_data}
 

@@ -5,13 +5,12 @@ import os
 import shutil
 from os import path
 from pathlib import Path
-from typing import List, Optional, Union
 
 from questionary import prompt
 
 logger = logging.getLogger()
 
-Pathlike = Union[str, Path]
+Pathlike = str | Path
 
 
 def is_termux() -> bool:
@@ -25,7 +24,7 @@ def is_termux() -> bool:
     ).startswith("/data/data/com.termux")
 
 
-def get_termux_shared_storage() -> Optional[Path]:
+def get_termux_shared_storage() -> Path | None:
     """Get Termux shared storage path if available
 
     Returns:
@@ -117,7 +116,7 @@ def expand_path(file_path: Pathlike) -> Path:
     return Path(os.path.expandvars(os.path.expanduser(file_path)))
 
 
-def create_dirs(dirs: Optional[List[str]] = None) -> None:
+def create_dirs(dirs: list[str] | None = None) -> None:
     """Creates all folders in dirs
 
     Args:
@@ -134,7 +133,7 @@ def create_dirs(dirs: Optional[List[str]] = None) -> None:
                 logger.error("Unable to create directory: {}", dir_name)
 
 
-def convert_to_path(f: Union[str, Path]) -> Path:
+def convert_to_path(f: str | Path) -> Path:
     if isinstance(f, str):
         f = Path(f)
     return f

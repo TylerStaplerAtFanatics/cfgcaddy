@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-import platform
-import socket
 from dataclasses import dataclass
 from pathlib import Path
 

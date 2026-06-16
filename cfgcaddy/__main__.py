@@ -13,6 +13,9 @@ import cfgcaddy
 import cfgcaddy.config
 import cfgcaddy.linker
 import cfgcaddy.utils
+from cfgcaddy.commands.diff import diff
+from cfgcaddy.commands.doctor import doctor
+from cfgcaddy.commands.profiles import profiles
 from cfgcaddy.commands.secrets import secrets
 
 logger = logging.getLogger()
@@ -153,9 +156,14 @@ def main(ctx, debug, quiet, profile):
     help="The path to your cfgcaddy.yml",
 )
 @click.option("-y", "--no-interactive", is_flag=True)
+@click.option("--dry-run", is_flag=True, help="Show pending changes without applying them")
 @click.pass_context
-def link(ctx, config, no_interactive):
+def link(ctx, config, no_interactive, dry_run):
     """Link your config files"""
+    if dry_run:
+        ctx.invoke(diff, config=config)
+        return
+
     if not os.path.isfile(config):
         logger.error(
             "Cannot find cfgcaddy.yml, please specify path to config using '-c' option or create/link a new config using the 'cfgcaddy init' command."
@@ -227,7 +235,10 @@ def is_admin():
         return False
 
 
+main.add_command(diff)
+main.add_command(doctor)
 main.add_command(secrets)
+main.add_command(profiles)
 
 
 if __name__ == "__main__":
